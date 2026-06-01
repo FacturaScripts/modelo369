@@ -1,0 +1,15 @@
+{
+    "destination-country": "País de destino",
+    "download-csv": "Descargar CSV",
+    "external-oss-regime": "Régimen Exterior de la Unión",
+    "ioss-regime": "Régimen de Importación (IOSS)",
+    "model-369": "Modelo 369",
+    "model-369-p": "Declaración del IVA de la Ventanilla Única para ventas intracomunitarias a consumidores finales de la UE.",
+    "no-data-for-period": "No hay datos para el período seleccionado.",
+    "oss-regime": "Régimen de la Unión (OSS)",
+    "quarterly": "Trimestral",
+    "regime": "Régimen",
+    "vat-amount": "Cuota IVA",
+    "vat-rate": "Tipo IVA",
+    "view-data": "Ver datos"
+}
