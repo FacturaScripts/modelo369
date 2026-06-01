@@ -19,6 +19,7 @@
 
 namespace FacturaScripts\Test\Plugins;
 
+use FacturaScripts\Core\Lib\Calculator;
 use FacturaScripts\Dinamic\Model\Cliente;
 use FacturaScripts\Dinamic\Model\Contacto;
 use FacturaScripts\Dinamic\Model\FacturaCliente;
@@ -179,6 +180,9 @@ final class Modelo369Test extends TestCase
         $linea->pvpunitario = 500;
         $linea->codimpuesto = 'IVA21';
         $this->assertTrue($linea->save());
+
+        $lines = $invoice->getLines();
+        $this->assertTrue(Calculator::calculate($invoice, $lines, true));
 
         $year = (string)date('Y');
         $month = (int)date('n');
