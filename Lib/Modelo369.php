@@ -20,20 +20,28 @@
 namespace FacturaScripts\Plugins\Modelo369\Lib;
 
 use FacturaScripts\Core\Base\DataBase;
+use FacturaScripts\Core\DataSrc\Empresas;
+use FacturaScripts\Core\DataSrc\Paises;
+use FacturaScripts\Core\Lib\ProductType;
 use FacturaScripts\Core\Tools;
+use FacturaScripts\Dinamic\Model\Ejercicio;
 
 /**
  * @author Esteban Sánchez Martínez <esteban@factura.city>
  */
 class Modelo369
 {
-    public static function getEuCountryCodes(): array
+    /**
+     * Convierte un código de país alfa-3 (codpais) a su código ISO alfa-2 (codiso).
+     */
+    public static function getCountryIso(?string $codpais): string
     {
-        return [
-            'AUT', 'BEL', 'BGR', 'CYP', 'CZE', 'DEU', 'DNK', 'EST', 'FIN', 'FRA',
-            'GRC', 'HRV', 'HUN', 'IRL', 'ITA', 'LTU', 'LUX', 'LVA', 'MLT', 'NLD',
-            'POL', 'PRT', 'ROU', 'SWE', 'SVN', 'SVK'
-        ];
+        if (empty($codpais)) {
+            return '';
+        }
+
+        $pais = Paises::get($codpais);
+        return $pais->codiso ?? '';
     }
 
     public static function getData(string $codejercicio, string $periodo): array
@@ -50,19 +58,26 @@ class Modelo369
         // El país fiscal del cliente (donde está establecido) determina la inclusión en el 369,
         // no la dirección de envío de la factura (f.codpais hereda el país de la empresa).
         // El país del cliente está en contactos (idcontactofact), no en la tabla clientes.
+        // Clasificamos cada línea como servicio o bien según el tipo del producto asociado
+        // (Producto.tipo = 'Servicio' -> servicios; resto, incluido sin producto -> bienes),
+        // porque el modelo 369 separa prestaciones de servicios y entregas de bienes.
+        $kindCase = "CASE WHEN p.tipo = " . $db->var2str(ProductType::SERVICE) . " THEN 'services' ELSE 'goods' END";
+
         $sql = 'SELECT ct.codpais,'
             . ' l.iva,'
+            . ' ' . $kindCase . ' as kind,'
             . ' SUM(l.pvptotal * (1 - COALESCE(f.dtopor1, 0) / 100) * (1 - COALESCE(f.dtopor2, 0) / 100)) as baseimponible,'
             . ' SUM(l.pvptotal * (1 - COALESCE(f.dtopor1, 0) / 100) * (1 - COALESCE(f.dtopor2, 0) / 100) * l.iva / 100) as cuotaiva'
             . ' FROM facturascli f'
             . ' INNER JOIN lineasfacturascli l ON l.idfactura = f.idfactura'
             . ' INNER JOIN clientes c ON c.codcliente = f.codcliente'
             . ' INNER JOIN contactos ct ON ct.idcontacto = c.idcontactofact'
+            . ' LEFT JOIN productos p ON p.idproducto = l.idproducto'
             . ' WHERE f.fecha >= ' . $db->var2str($dates['from'])
             . ' AND f.fecha <= ' . $db->var2str($dates['to'])
             . ' AND ct.codpais IN (' . $countriesIn . ')'
             . ' AND l.iva > 0'
-            . ' GROUP BY ct.codpais, l.iva'
+            . ' GROUP BY ct.codpais, l.iva, ' . $kindCase
             . ' ORDER BY ct.codpais ASC, l.iva ASC;';
 
         $data = [];
@@ -70,12 +85,77 @@ class Modelo369
             $data[] = [
                 'codpais' => $row['codpais'],
                 'iva' => (float)$row['iva'],
+                'kind' => $row['kind'],
                 'baseimponible' => round((float)$row['baseimponible'], 2),
                 'cuotaiva' => round((float)$row['cuotaiva'], 2),
             ];
         }
 
         return $data;
+    }
+
+    /**
+     * Devuelve los datos del declarante (titular) a partir del ejercicio seleccionado:
+     * NIF, nombre/razón social y código ISO alfa-2 del país de la empresa.
+     */
+    public static function getDeclarant(string $codejercicio): array
+    {
+        $declarant = ['nif' => '', 'nombre' => '', 'codiso' => 'ES'];
+
+        $ejercicio = new Ejercicio();
+        if (false === $ejercicio->loadFromCode($codejercicio)) {
+            return $declarant;
+        }
+
+        $empresa = Empresas::get($ejercicio->idempresa);
+        if (empty($empresa->idempresa)) {
+            return $declarant;
+        }
+
+        $declarant['nif'] = $empresa->cifnif ?? '';
+        $declarant['nombre'] = $empresa->nombre ?? '';
+        $declarant['codiso'] = self::getCountryIso($empresa->codpais);
+
+        return $declarant;
+    }
+
+    public static function getDefaultPeriod(string $regime): string
+    {
+        if ($regime === 'ioss') {
+            return date('m');
+        }
+
+        $month = (int)date('m');
+        if ($month <= 3) {
+            return 'T1';
+        } elseif ($month <= 6) {
+            return 'T2';
+        } elseif ($month <= 9) {
+            return 'T3';
+        }
+        return 'T4';
+    }
+
+    public static function getEuCountryCodes(): array
+    {
+        return [
+            'AUT', 'BEL', 'BGR', 'CYP', 'CZE', 'DEU', 'DNK', 'EST', 'FIN', 'FRA',
+            'GRC', 'HRV', 'HUN', 'IRL', 'ITA', 'LTU', 'LUX', 'LVA', 'MLT', 'NLD',
+            'POL', 'PRT', 'ROU', 'SWE', 'SVN', 'SVK'
+        ];
+    }
+
+    /**
+     * Periodo tal y como debe aparecer en la cabecera del fichero:
+     * trimestral "1T".."4T" (el plugin lo guarda como "T1".."T4") y mensual "01".."12".
+     */
+    public static function getHeaderPeriod(string $periodo): string
+    {
+        if (strlen($periodo) === 2 && $periodo[0] === 'T') {
+            return $periodo[1] . 'T';
+        }
+
+        return $periodo;
     }
 
     public static function getPeriodDates(string $codejercicio, string $periodo): array
@@ -109,6 +189,18 @@ class Modelo369
         }
     }
 
+    /**
+     * Número de periodo (1..4 trimestral, 1..12 mensual) con dos posiciones.
+     */
+    public static function getPeriodNumber(string $periodo): string
+    {
+        if (strlen($periodo) === 2 && $periodo[0] === 'T') {
+            return '0' . $periodo[1];
+        }
+
+        return str_pad((string)(int)$periodo, 2, '0', STR_PAD_LEFT);
+    }
+
     public static function getPeriodOptions(string $regime): array
     {
         if ($regime === 'ioss') {
@@ -136,20 +228,29 @@ class Modelo369
         ];
     }
 
-    public static function getDefaultPeriod(string $regime): string
+    /**
+     * Tipo de periodo: "M" para el régimen de importación (IOSS, mensual), "T" en el resto.
+     */
+    public static function getPeriodType(string $regime): string
     {
-        if ($regime === 'ioss') {
-            return date('m');
-        }
+        return $regime === 'ioss' ? 'M' : 'T';
+    }
 
-        $month = (int)date('m');
-        if ($month <= 3) {
-            return 'T1';
-        } elseif ($month <= 6) {
-            return 'T2';
-        } elseif ($month <= 9) {
-            return 'T3';
+    /**
+     * Código de régimen tal y como lo espera el fichero: MOSS (Unión), VOES (Exterior),
+     * IMPO (Importación).
+     */
+    public static function getRegimeCode(string $regime): string
+    {
+        switch ($regime) {
+            case 'external-oss':
+                return 'VOES';
+
+            case 'ioss':
+                return 'IMPO';
+
+            default:
+                return 'MOSS';
         }
-        return 'T4';
     }
 }

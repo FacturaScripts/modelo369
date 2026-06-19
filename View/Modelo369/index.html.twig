@@ -87,6 +87,10 @@
 								<i class="fa-solid fa-download me-1"></i>
 								{{ trans('download-csv') }}
 							</button>
+							<button type="button" onclick="downloadTxt369();" class="btn btn-secondary btn-spin-action flex-fill">
+								<i class="fa-solid fa-file-lines me-1"></i>
+								{{ trans('download-txt') }}
+							</button>
 						</div>
 					</div>
 
@@ -98,6 +102,7 @@
 										<thead>
 											<tr>
 												<th>{{ trans('destination-country') }}</th>
+												<th>{{ trans('operation-type') }}</th>
 												<th class="text-end">{{ trans('vat-rate') }}</th>
 												<th class="text-end">{{ trans('tax-base') }}</th>
 												<th class="text-end">{{ trans('vat-amount') }}</th>
@@ -107,6 +112,7 @@
 											{% for row in fsc.data %}
 												<tr>
 													<td>{{ fsc.getCountryName(row.codpais) }}</td>
+													<td>{{ fsc.getOperationType(row.kind) }}</td>
 													<td class="text-end">{{ number(row.iva) }}
 														%</td>
 													<td class="text-end">{{ money(row.baseimponible) }}</td>
@@ -117,6 +123,7 @@
 										<tfoot>
 											<tr class="fw-bold table-light">
 												<td>{{ trans('total') }}</td>
+												<td></td>
 												<td></td>
 												<td class="text-end">{{ money(fsc.totalBase) }}</td>
 												<td class="text-end">{{ money(fsc.totalCuota) }}</td>
@@ -202,6 +209,12 @@ label: "{{ trans('december')|e('js') }}"
 
 function downloadCsv369() {
 document.getElementById('action').value = 'download-csv';
+document.getElementById('fModelo369').submit();
+document.getElementById('action').value = '';
+}
+
+function downloadTxt369() {
+document.getElementById('action').value = 'download-txt';
 document.getElementById('fModelo369').submit();
 document.getElementById('action').value = '';
 }

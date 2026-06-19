@@ -24,6 +24,7 @@ use FacturaScripts\Core\DataSrc\Empresas;
 use FacturaScripts\Core\DataSrc\Paises;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Dinamic\Lib\Modelo369 as Modelo369Lib;
+use FacturaScripts\Dinamic\Lib\Modelo369Txt;
 
 /**
  * @author Esteban Sánchez Martínez <esteban@factura.city>
@@ -56,6 +57,17 @@ class Modelo369 extends Controller
         return Empresas::all();
     }
 
+    public function getCountryName(string $codpais): string
+    {
+        $pais = Paises::get($codpais);
+        return $pais->nombre ?? $codpais;
+    }
+
+    public function getOperationType(string $kind): string
+    {
+        return $kind === 'services' ? Tools::trans('services') : Tools::trans('goods');
+    }
+
     public function getPageData(): array
     {
         $data = parent::getPageData();
@@ -77,12 +89,6 @@ class Modelo369 extends Controller
             'external-oss' => Tools::trans('external-oss-regime'),
             'ioss' => Tools::trans('ioss-regime'),
         ];
-    }
-
-    public function getCountryName(string $codpais): string
-    {
-        $pais = Paises::get($codpais);
-        return $pais->nombre ?? $codpais;
     }
 
     public function privateCore(&$response, $user, $permissions)
@@ -107,23 +113,23 @@ class Modelo369 extends Controller
             return;
         }
 
+        if ($action === 'download-txt') {
+            $this->downloadTxt();
+            return;
+        }
+
         // Solo cargamos datos cuando el formulario ha sido enviado (POST)
         if ($this->request->method() === 'POST') {
             $this->loadData();
         }
     }
 
-    protected function loadData(): void
+    protected function csvField(string $value): string
     {
-        $this->searched = true;
-        $this->data = Modelo369Lib::getData($this->codejercicio, $this->periodo);
-
-        $this->totalBase = 0.0;
-        $this->totalCuota = 0.0;
-        foreach ($this->data as $row) {
-            $this->totalBase += $row['baseimponible'];
-            $this->totalCuota += $row['cuotaiva'];
+        if (str_contains($value, ';') || str_contains($value, '"') || str_contains($value, "\n")) {
+            return '"' . str_replace('"', '""', $value) . '"';
         }
+        return $value;
     }
 
     protected function downloadCsv(): void
@@ -138,6 +144,7 @@ class Modelo369 extends Controller
         $content = "\xEF\xBB\xBF";
         $content .= implode(';', [
             Tools::trans('destination-country'),
+            Tools::trans('operation-type'),
             Tools::trans('vat-rate') . ' (%)',
             Tools::trans('tax-base'),
             Tools::trans('vat-amount'),
@@ -146,6 +153,7 @@ class Modelo369 extends Controller
         foreach ($this->data as $row) {
             $content .= implode(';', [
                 $this->csvField($this->getCountryName($row['codpais'])),
+                $this->csvField($this->getOperationType($row['kind'] ?? 'goods')),
                 $this->csvField(Tools::number($row['iva'])),
                 $this->csvField(Tools::number($row['baseimponible'])),
                 $this->csvField(Tools::number($row['cuotaiva'])),
@@ -154,6 +162,7 @@ class Modelo369 extends Controller
 
         $content .= implode(';', [
             $this->csvField(Tools::trans('total')),
+            '',
             '',
             $this->csvField(Tools::number($this->totalBase)),
             $this->csvField(Tools::number($this->totalCuota)),
@@ -167,11 +176,35 @@ class Modelo369 extends Controller
             ->setContent($content);
     }
 
-    protected function csvField(string $value): string
+    protected function downloadTxt(): void
     {
-        if (str_contains($value, ';') || str_contains($value, '"') || str_contains($value, "\n")) {
-            return '"' . str_replace('"', '""', $value) . '"';
+        $this->setTemplate(false);
+
+        $this->loadData();
+
+        $fileName = 'modelo_369_' . $this->codejercicio . '_' . $this->periodo . '.txt';
+
+        // El fichero del modelo 369 se genera en texto plano de ancho fijo (ISO-8859-1).
+        $content = Modelo369Txt::build($this->codejercicio, $this->periodo, $this->regime, $this->data);
+
+        $this->response
+            ->header('Content-Type', 'text/plain; charset=ISO-8859-1')
+            ->header('Content-Disposition', 'attachment; filename="' . $fileName . '"')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', '0')
+            ->setContent($content);
+    }
+
+    protected function loadData(): void
+    {
+        $this->searched = true;
+        $this->data = Modelo369Lib::getData($this->codejercicio, $this->periodo);
+
+        $this->totalBase = 0.0;
+        $this->totalCuota = 0.0;
+        foreach ($this->data as $row) {
+            $this->totalBase += $row['baseimponible'];
+            $this->totalCuota += $row['cuotaiva'];
         }
-        return $value;
     }
 }
