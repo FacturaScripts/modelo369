@@ -20,6 +20,7 @@
 namespace FacturaScripts\Plugins\Modelo369\Controller;
 
 use FacturaScripts\Core\Base\Controller;
+use FacturaScripts\Core\DataSrc\Empresas;
 use FacturaScripts\Core\DataSrc\Paises;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Dinamic\Lib\Modelo369 as Modelo369Lib;
@@ -50,15 +51,9 @@ class Modelo369 extends Controller
     /** @var float */
     public $totalCuota = 0.0;
 
-    public function getEjercicios(): array
+    public function getCompanies(): array
     {
-        $list = [];
-        $year = (int)date('Y');
-        for ($i = 0; $i < 5; $i++) {
-            $value = (string)($year - $i);
-            $list[$value] = $value;
-        }
-        return $list;
+        return Empresas::all();
     }
 
     public function getPageData(): array
