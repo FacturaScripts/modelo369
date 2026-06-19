@@ -1,6 +1,5 @@
 {
     "destination-country": "País de destino",
-    "download-csv": "Descargar CSV",
     "download-txt": "Descargar TXT",
     "external-oss-regime": "Régimen Exterior de la Unión",
     "goods": "Bienes",
@@ -10,9 +9,7 @@
     "no-data-for-period": "No hay datos para el período seleccionado.",
     "operation-type": "Tipo de operación",
     "oss-regime": "Régimen de la Unión (OSS)",
-    "quarterly": "Trimestral",
     "regime": "Régimen",
-    "services": "Servicios",
     "vat-amount": "Cuota IVA",
     "vat-rate": "Tipo IVA",
     "view-data": "Ver datos"
