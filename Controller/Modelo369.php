@@ -72,6 +72,7 @@ class Modelo369 extends Controller
     {
         $data = parent::getPageData();
         $data['menu'] = 'reports';
+        $data['submenu'] = 'tax-models';
         $data['title'] = 'model-369';
         $data['icon'] = 'fa-solid fa-globe';
         return $data;
