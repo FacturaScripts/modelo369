@@ -129,24 +129,27 @@ final class Modelo369Test extends TestCase
         $this->assertTrue($customer->delete());
     }
 
-    public function testGetEuCountryCodesDoesNotIncludeSpain(): void
+    public function testGetCountryIso(): void
     {
-        $codes = Modelo369::getEuCountryCodes();
-        $this->assertNotContains('ESP', $codes);
+        $this->assertEquals('FR', Modelo369::getCountryIso('FRA'));
+        $this->assertEquals('DE', Modelo369::getCountryIso('DEU'));
+        $this->assertEquals('', Modelo369::getCountryIso(''));
+        $this->assertEquals('', Modelo369::getCountryIso(null));
     }
 
-    public function testGetEuCountryCodesIncludesMainCountries(): void
+    public function testGetCountryIsoUsesElForGreece(): void
     {
-        $codes = Modelo369::getEuCountryCodes();
-        $this->assertContains('FRA', $codes);
-        $this->assertContains('DEU', $codes);
-        $this->assertContains('ITA', $codes);
+        // el diseño de registro de la AEAT usa "EL" para Grecia
+        $this->assertEquals('EL', Modelo369::getCountryIso('GRC'));
     }
 
-    public function testGetEuCountryCodesNotEmpty(): void
+    public function testGetDataExcludesSpainAndUnitedKingdom(): void
     {
-        $codes = Modelo369::getEuCountryCodes();
-        $this->assertNotEmpty($codes);
+        $year = (string)date('Y');
+        foreach (Modelo369::getData($year, 'T' . (string)ceil((int)date('n') / 3)) as $row) {
+            $this->assertNotEquals('ESP', $row['codpais']);
+            $this->assertNotEquals('GBR', $row['codpais']);
+        }
     }
 
     public function testGetHeaderPeriod(): void
