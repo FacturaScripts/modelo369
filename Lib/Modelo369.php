@@ -23,6 +23,7 @@ use FacturaScripts\Core\Base\DataBase;
 use FacturaScripts\Core\DataSrc\Empresas;
 use FacturaScripts\Core\DataSrc\Paises;
 use FacturaScripts\Core\Lib\ProductType;
+use FacturaScripts\Core\Lib\Vies;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Dinamic\Model\Ejercicio;
 
@@ -32,7 +33,8 @@ use FacturaScripts\Dinamic\Model\Ejercicio;
 class Modelo369
 {
     /**
-     * Convierte un código de país alfa-3 (codpais) a su código ISO alfa-2 (codiso).
+     * Convierte un código de país alfa-3 (codpais) al código de país del fichero de la AEAT:
+     * ISO alfa-2 (codiso), con "EL" para Grecia según el diseño de registro DR369e21.
      */
     public static function getCountryIso(?string $codpais): string
     {
@@ -41,7 +43,8 @@ class Modelo369
         }
 
         $pais = Paises::get($codpais);
-        return $pais->codiso ?? '';
+        $codiso = $pais->codiso ?? '';
+        return empty($codiso) ? '' : Vies::vatPrefix($codiso);
     }
 
     public static function getData(string $codejercicio, string $periodo): array
@@ -49,9 +52,15 @@ class Modelo369
         $db = new DataBase();
         $dates = self::getPeriodDates($codejercicio, $periodo);
 
+        // países de la UE según el core, excluyendo España (las ventas nacionales no van en el 369)
         $countries = [];
-        foreach (self::getEuCountryCodes() as $code) {
-            $countries[] = $db->var2str($code);
+        foreach (Paises::all() as $pais) {
+            if ($pais->codpais !== 'ESP' && Paises::miembroUE($pais->codpais)) {
+                $countries[] = $db->var2str($pais->codpais);
+            }
+        }
+        if (empty($countries)) {
+            return [];
         }
         $countriesIn = implode(', ', $countries);
 
@@ -134,15 +143,6 @@ class Modelo369
             return 'T3';
         }
         return 'T4';
-    }
-
-    public static function getEuCountryCodes(): array
-    {
-        return [
-            'AUT', 'BEL', 'BGR', 'CYP', 'CZE', 'DEU', 'DNK', 'EST', 'FIN', 'FRA',
-            'GRC', 'HRV', 'HUN', 'IRL', 'ITA', 'LTU', 'LUX', 'LVA', 'MLT', 'NLD',
-            'POL', 'PRT', 'ROU', 'SWE', 'SVN', 'SVK'
-        ];
     }
 
     /**
