@@ -23,6 +23,8 @@ use FacturaScripts\Core\Lib\Calculator;
 use FacturaScripts\Dinamic\Model\Cliente;
 use FacturaScripts\Dinamic\Model\Contacto;
 use FacturaScripts\Dinamic\Model\FacturaCliente;
+use FacturaScripts\Dinamic\Model\PagoCliente;
+use FacturaScripts\Dinamic\Model\ReciboCliente;
 use FacturaScripts\Dinamic\Lib\Modelo369;
 use FacturaScripts\Dinamic\Lib\Modelo369Txt;
 use FacturaScripts\Test\Traits\DefaultSettingsTrait;
@@ -42,6 +44,25 @@ final class Modelo369Test extends TestCase
         self::setDefaultSettings();
         self::installAccountingPlan();
         self::removeTaxRegularization();
+
+        // creamos las tablas de recibos y pagos antes de guardar facturas: al guardarlas, el core genera los
+        // recibos dentro de una transacción y no se pueden crear tablas dentro de ella
+        new ReciboCliente();
+        new PagoCliente();
+    }
+
+    public function testGetCountryIso(): void
+    {
+        $this->assertEquals('FR', Modelo369::getCountryIso('FRA'));
+        $this->assertEquals('DE', Modelo369::getCountryIso('DEU'));
+        $this->assertEquals('', Modelo369::getCountryIso(''));
+        $this->assertEquals('', Modelo369::getCountryIso(null));
+    }
+
+    public function testGetCountryIsoUsesElForGreece(): void
+    {
+        // el diseño de registro de la AEAT usa "EL" para Grecia
+        $this->assertEquals('EL', Modelo369::getCountryIso('GRC'));
     }
 
     public function testGetDataEmptyForSpanishClient(): void
@@ -76,6 +97,46 @@ final class Modelo369Test extends TestCase
 
         $this->assertTrue($invoice->delete());
         $this->assertTrue($customer->getDefaultAddress()->delete());
+        $this->assertTrue($customer->delete());
+    }
+
+    public function testGetDataExcludesSpainAndUnitedKingdom(): void
+    {
+        // cliente del Reino Unido con una factura en el periodo: no es de la UE desde el 31/01/2020
+        $customer = new Cliente();
+        $customer->cifnif = 'GB' . mt_rand(100000000, 999999999);
+        $customer->nombre = 'Cliente GB ' . mt_rand(1, 99999);
+        $customer->razonsocial = 'Empresa GB ' . mt_rand(1, 99999);
+        $customer->tipoidfiscal = 'VAT';
+        $this->assertTrue($customer->save());
+
+        $contact = new Contacto();
+        $this->assertTrue($contact->load($customer->idcontactofact));
+        $contact->codpais = 'GBR';
+        $this->assertTrue($contact->save());
+
+        $invoice = new FacturaCliente();
+        $invoice->setSubject($customer);
+        $this->assertTrue($invoice->save());
+
+        $linea = $invoice->getNewLine();
+        $linea->descripcion = 'Servicio digital';
+        $linea->cantidad = 1;
+        $linea->pvpunitario = 300;
+        $linea->codimpuesto = 'IVA21';
+        $this->assertTrue($linea->save());
+
+        $lines = $invoice->getLines();
+        $this->assertTrue(Calculator::calculate($invoice, $lines, true));
+
+        $year = (string)date('Y');
+        foreach (Modelo369::getData($year, 'T' . (string)ceil((int)date('n') / 3)) as $row) {
+            $this->assertNotEquals('ESP', $row['codpais']);
+            $this->assertNotEquals('GBR', $row['codpais']);
+        }
+
+        $this->assertTrue($invoice->delete());
+        $this->assertTrue($contact->delete());
         $this->assertTrue($customer->delete());
     }
 
@@ -127,26 +188,6 @@ final class Modelo369Test extends TestCase
         $this->assertTrue($invoice->delete());
         $this->assertTrue($contact->delete());
         $this->assertTrue($customer->delete());
-    }
-
-    public function testGetEuCountryCodesDoesNotIncludeSpain(): void
-    {
-        $codes = Modelo369::getEuCountryCodes();
-        $this->assertNotContains('ESP', $codes);
-    }
-
-    public function testGetEuCountryCodesIncludesMainCountries(): void
-    {
-        $codes = Modelo369::getEuCountryCodes();
-        $this->assertContains('FRA', $codes);
-        $this->assertContains('DEU', $codes);
-        $this->assertContains('ITA', $codes);
-    }
-
-    public function testGetEuCountryCodesNotEmpty(): void
-    {
-        $codes = Modelo369::getEuCountryCodes();
-        $this->assertNotEmpty($codes);
     }
 
     public function testGetHeaderPeriod(): void

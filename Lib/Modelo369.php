@@ -24,6 +24,7 @@ use FacturaScripts\Core\DataSrc\Empresas;
 use FacturaScripts\Core\DataSrc\Paises;
 use FacturaScripts\Core\Lib\ProductType;
 use FacturaScripts\Core\Tools;
+use FacturaScripts\Dinamic\Lib\Vies;
 use FacturaScripts\Dinamic\Model\Ejercicio;
 
 /**
@@ -32,7 +33,13 @@ use FacturaScripts\Dinamic\Model\Ejercicio;
 class Modelo369
 {
     /**
-     * Convierte un código de país alfa-3 (codpais) a su código ISO alfa-2 (codiso).
+     * Convierte un código de país alfa-3 (codpais) al código de país del fichero de la AEAT: el prefijo del
+     * NIF-IVA según Vies::vatPrefix() del core, que coincide con el ISO alfa-2 (codiso) salvo en Grecia
+     * ("EL" en lugar de "GR"), tal y como indica el diseño de registro DR369e21.
+     *
+     * @param string|null $codpais código de país alfa-3
+     *
+     * @return string código de país de dos letras, o cadena vacía si el país no existe o no tiene código ISO
      */
     public static function getCountryIso(?string $codpais): string
     {
@@ -41,7 +48,8 @@ class Modelo369
         }
 
         $pais = Paises::get($codpais);
-        return $pais->codiso ?? '';
+        $codiso = strtoupper($pais->codiso ?? '');
+        return empty($codiso) ? '' : Vies::vatPrefix($codiso);
     }
 
     public static function getData(string $codejercicio, string $periodo): array
@@ -49,9 +57,15 @@ class Modelo369
         $db = new DataBase();
         $dates = self::getPeriodDates($codejercicio, $periodo);
 
+        // países de la UE según el core, excluyendo España (las ventas nacionales no van en el 369)
         $countries = [];
-        foreach (self::getEuCountryCodes() as $code) {
-            $countries[] = $db->var2str($code);
+        foreach (Paises::all() as $pais) {
+            if ($pais->codpais !== 'ESP' && Paises::miembroUE($pais->codpais)) {
+                $countries[] = $db->var2str($pais->codpais);
+            }
+        }
+        if (empty($countries)) {
+            return [];
         }
         $countriesIn = implode(', ', $countries);
 
@@ -134,15 +148,6 @@ class Modelo369
             return 'T3';
         }
         return 'T4';
-    }
-
-    public static function getEuCountryCodes(): array
-    {
-        return [
-            'AUT', 'BEL', 'BGR', 'CYP', 'CZE', 'DEU', 'DNK', 'EST', 'FIN', 'FRA',
-            'GRC', 'HRV', 'HUN', 'IRL', 'ITA', 'LTU', 'LUX', 'LVA', 'MLT', 'NLD',
-            'POL', 'PRT', 'ROU', 'SWE', 'SVN', 'SVK'
-        ];
     }
 
     /**
