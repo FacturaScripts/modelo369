@@ -1,16 +1,15 @@
 {
     "destination-country": "País de destino",
     "download-txt": "Descargar TXT",
-    "external-oss-regime": "Régimen Exterior de la Unión",
-    "goods": "Bienes",
-    "ioss-regime": "Régimen de Importación (IOSS)",
+    "external-oss-regime": "Réxime Exterior da Unión",
+    "goods": "Bens",
+    "ioss-regime": "Réxime de Importación (IOSS)",
     "model-369": "Modelo 369",
-    "model-369-p": "Declaración del IVA de la Ventanilla Única para ventas intracomunitarias a consumidores finales de la UE.",
-    "no-data-for-period": "No hay datos para el período seleccionado.",
+    "model-369-p": "Declaración do IVA da Ventanilla Única para vendas intracomunitarias a consumidores finais da UE.",
+    "no-data-for-period": "Non hai datos para o período seleccionado.",
     "operation-type": "Tipo de operación",
-    "oss-regime": "Régimen de la Unión (OSS)",
-    "regime": "Régimen",
-    "vat-amount": "Cuota IVA",
+    "oss-regime": "Réxime da Unión (OSS)",
+    "regime": "Réxime",
     "vat-rate": "Tipo IVA",
     "view-data": "Ver datos"
 }
