@@ -23,8 +23,8 @@ use FacturaScripts\Core\Base\DataBase;
 use FacturaScripts\Core\DataSrc\Empresas;
 use FacturaScripts\Core\DataSrc\Paises;
 use FacturaScripts\Core\Lib\ProductType;
-use FacturaScripts\Core\Lib\Vies;
 use FacturaScripts\Core\Tools;
+use FacturaScripts\Dinamic\Lib\Vies;
 use FacturaScripts\Dinamic\Model\Ejercicio;
 
 /**
@@ -33,8 +33,13 @@ use FacturaScripts\Dinamic\Model\Ejercicio;
 class Modelo369
 {
     /**
-     * Convierte un código de país alfa-3 (codpais) al código de país del fichero de la AEAT:
-     * ISO alfa-2 (codiso), con "EL" para Grecia según el diseño de registro DR369e21.
+     * Convierte un código de país alfa-3 (codpais) al código de país del fichero de la AEAT: el prefijo del
+     * NIF-IVA según Vies::vatPrefix() del core, que coincide con el ISO alfa-2 (codiso) salvo en Grecia
+     * ("EL" en lugar de "GR"), tal y como indica el diseño de registro DR369e21.
+     *
+     * @param string|null $codpais código de país alfa-3
+     *
+     * @return string código de país de dos letras, o cadena vacía si el país no existe o no tiene código ISO
      */
     public static function getCountryIso(?string $codpais): string
     {
@@ -43,7 +48,7 @@ class Modelo369
         }
 
         $pais = Paises::get($codpais);
-        $codiso = $pais->codiso ?? '';
+        $codiso = strtoupper($pais->codiso ?? '');
         return empty($codiso) ? '' : Vies::vatPrefix($codiso);
     }
 
